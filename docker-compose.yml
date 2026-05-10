@@ -1,0 +1,184 @@
+services:
+  postgres:
+    image: timescale/timescaledb:latest-pg16
+    environment:
+      POSTGRES_DB: scanner
+      POSTGRES_USER: scanner
+      POSTGRES_PASSWORD: scanner
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U scanner -d scanner"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://scanner:scanner@postgres:5432/scanner
+      REDIS_URL: redis://redis:6379/0
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  scheduler:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: python -m app.workers.scheduler
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://scanner:scanner@postgres:5432/scanner
+      REDIS_URL: redis://redis:6379/0
+    volumes:
+      - .:/app
+    depends_on:
+      api:
+        condition: service_started
+
+  worker_market_data:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: python -m app.workers.run_role market_data
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://scanner:scanner@postgres:5432/scanner
+      REDIS_URL: redis://redis:6379/0
+    volumes:
+      - .:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  worker_orderbooks:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: python -m app.workers.run_role orderbooks
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://scanner:scanner@postgres:5432/scanner
+      REDIS_URL: redis://redis:6379/0
+    volumes:
+      - .:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  worker_dex:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: python -m app.workers.run_role dex
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://scanner:scanner@postgres:5432/scanner
+      REDIS_URL: redis://redis:6379/0
+    volumes:
+      - .:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  worker_hyperliquid:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: python -m app.workers.run_role hyperliquid
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://scanner:scanner@postgres:5432/scanner
+      REDIS_URL: redis://redis:6379/0
+    volumes:
+      - .:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  worker_hydromancer:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: python -m app.workers.run_role hydromancer
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://scanner:scanner@postgres:5432/scanner
+      REDIS_URL: redis://redis:6379/0
+    volumes:
+      - .:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  worker_features:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: python -m app.workers.run_role features
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://scanner:scanner@postgres:5432/scanner
+      REDIS_URL: redis://redis:6379/0
+    volumes:
+      - .:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  worker_alerts:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: python -m app.workers.run_role alerts
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://scanner:scanner@postgres:5432/scanner
+      REDIS_URL: redis://redis:6379/0
+    volumes:
+      - .:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  dashboard:
+    image: node:22-alpine
+    working_dir: /app/frontend
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
+    environment:
+      VITE_API_BASE_URL: http://localhost:8000
+    ports:
+      - "5173:5173"
+    volumes:
+      - .:/app
+    depends_on:
+      - api
+
+volumes:
+  postgres_data:
+
