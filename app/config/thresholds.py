@@ -15,3 +15,9 @@ SEVERITY_RANK = {
 
 TELEGRAM_SEVERITIES = {"high", "critical"}
 
+ZSCORE_THRESHOLDS = {
+    "medium": 2.5,  # TUNABLE: uncalibrated placeholder; calibrate after 2 weeks
+    "high": 3.5,  # TUNABLE: uncalibrated placeholder; calibrate after 2 weeks
+    "critical": 5.0,  # TUNABLE: uncalibrated placeholder; calibrate after 2 weeks
+}
+

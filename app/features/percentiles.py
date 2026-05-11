@@ -35,3 +35,18 @@ def median_multiple(value: float | None, history: list[float]) -> float | None:
     med = median(clean)
     return abs(value) / med if med else None
 
+
+def directional_median_multiple(value: float | None, history: list[float]) -> float | None:
+    """Like median_multiple but only compares against same-direction historical values."""
+    if value is None:
+        return None
+    same_direction = [
+        item
+        for item in history
+        if item is not None and item != 0 and (item > 0) == (value > 0)
+    ]
+    if not same_direction:
+        return None
+    med = median(abs(item) for item in same_direction)
+    return abs(value) / med if med else None
+

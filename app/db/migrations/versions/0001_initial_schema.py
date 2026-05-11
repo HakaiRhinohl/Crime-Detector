@@ -23,7 +23,10 @@ depends_on: Sequence[str] | None = None
 def upgrade() -> None:
     bind = op.get_bind()
     op.execute("CREATE EXTENSION IF NOT EXISTS timescaledb")
-    Base.metadata.create_all(bind=bind)
+    initial_tables = [
+        table for name, table in Base.metadata.tables.items() if name != "hourly_changes"
+    ]
+    Base.metadata.create_all(bind=bind, tables=initial_tables)
 
     for symbol in DEFAULT_EXCLUDED_ASSETS:
         reason = "Seeded major/stable exclusion"

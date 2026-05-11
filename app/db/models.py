@@ -8,6 +8,7 @@ from sqlalchemy import (
     DateTime,
     Float,
     ForeignKey,
+    Index,
     Integer,
     Numeric,
     Text,
@@ -222,3 +223,20 @@ class AlertState(Base):
     last_metric_value: Mapped[float | None] = mapped_column(Float)
     metadata_: Mapped[dict] = mapped_column("metadata", JSONB, default=dict, server_default="{}")
 
+
+class HourlyChange(Base):
+    __tablename__ = "hourly_changes"
+    __table_args__ = (
+        UniqueConstraint("asset_id", "ts", "metric", name="uq_hourly_change"),
+        Index("ix_hourly_changes_lookup", "asset_id", "metric", "ts"),
+        Index("ix_hourly_changes_segmented", "asset_id", "metric", "hour_block", "day_type", "btc_regime"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    asset_id: Mapped[int] = mapped_column(ForeignKey("assets.id", ondelete="CASCADE"), nullable=False)
+    ts: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    metric: Mapped[str] = mapped_column(Text, nullable=False)
+    pct_change: Mapped[float | None] = mapped_column(Float)
+    hour_block: Mapped[int] = mapped_column(Integer, nullable=False)
+    day_type: Mapped[str] = mapped_column(Text, nullable=False)
+    btc_regime: Mapped[str] = mapped_column(Text, nullable=False)

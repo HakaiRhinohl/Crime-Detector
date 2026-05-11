@@ -67,16 +67,18 @@ async def upsert_universe(session: AsyncSession, candidates: list[VenueSymbolCan
             overrides=overrides,
         )
         canonical = mapping.canonical_symbol
-        if canonical.upper() in excluded:
+        is_benchmark = canonical.upper() == "BTC"
+        is_monitored = canonical.upper() not in excluded
+        if not is_monitored and not is_benchmark:
             continue
 
         if canonical not in asset_ids_by_symbol:
             asset_stmt = (
                 insert(Asset)
-                .values(symbol=canonical, is_active=True)
+                .values(symbol=canonical, is_active=is_monitored)
                 .on_conflict_do_update(
                     index_elements=[Asset.symbol],
-                    set_={"is_active": True},
+                    set_={"is_active": is_monitored},
                 )
                 .returning(Asset.id)
             )

@@ -1,11 +1,17 @@
 from __future__ import annotations
 
-from app.anomalies.models import AlertCandidate, FeatureMap
+from app.anomalies.models import AlertCandidate, FeatureMap, preferred_value
 
 DETECTOR = "venue_specific"
 
 
 def detect(asset_id: int, symbol: str, features: FeatureMap) -> list[AlertCandidate]:
+    oi_pct = preferred_value(features, "oi_change_percentile", "seg_60d_1h", "90d_1h")
+    price_pct = preferred_value(features, "price_change_percentile", "seg_60d_1h", "90d_1h")
+    volume_pct = preferred_value(features, "volume_change_percentile", "seg_60d_1h", "90d_1h")
+    if max(oi_pct or 0, price_pct or 0, volume_pct or 0) < 95:
+        return []
+
     candidates: list[AlertCandidate] = []
     for (name, _window), (metric_value, meta) in features.items():
         if name not in {"venue_oi_share", "venue_volume_share", "upbit_volume_share"}:
@@ -24,7 +30,12 @@ def detect(asset_id: int, symbol: str, features: FeatureMap) -> list[AlertCandid
                     title=f"{symbol} | Venue-specific anomaly | {severity.upper()}",
                     message=f"{venue} accounts for {metric_value:.0%} of the latest {name.replace('_', ' ')}.",
                     interpretation="Anomaly is isolated to one venue, which can indicate early positioning or a temporary dislocation.",
-                    metrics={name: metric_value},
+                    metrics={
+                        name: metric_value,
+                        "oi_percentile": oi_pct,
+                        "price_percentile": price_pct,
+                        "volume_change_percentile": volume_pct,
+                    },
                     venues={"primary": venue},
                 )
             )

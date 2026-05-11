@@ -6,10 +6,9 @@ from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.alerts.dedupe import should_send, update_state
 from app.alerts.formatter import format_telegram_alert
 from app.alerts.telegram import send_telegram_message
-from app.anomalies.engine import generate_candidates
+from app.anomalies.engine import filter_candidates_with_cooldown, generate_candidates
 from app.anomalies.models import AlertCandidate
 from app.config.settings import get_settings
 from app.config.thresholds import TELEGRAM_SEVERITIES
@@ -18,12 +17,11 @@ from app.utils.time import utc_now
 
 
 async def process_alerts(session: AsyncSession) -> int:
-    candidates = await generate_candidates(session)
+    candidates = await filter_candidates_with_cooldown(session, await generate_candidates(session))
     sent = 0
     for candidate in candidates:
         telegram_sent = await maybe_send_telegram(session, candidate)
         await persist_candidate(session, candidate, telegram_sent)
-        await update_state(session, candidate)
         if telegram_sent:
             sent += 1
     await session.commit()
@@ -33,8 +31,6 @@ async def process_alerts(session: AsyncSession) -> int:
 async def maybe_send_telegram(session: AsyncSession, candidate: AlertCandidate) -> bool:
     settings = get_settings()
     if candidate.severity not in TELEGRAM_SEVERITIES and candidate.severity != "critical":
-        return False
-    if not await should_send(session, candidate):
         return False
     if candidate.severity != "critical":
         sent_today = await count_sent_today(session)
@@ -80,4 +76,3 @@ async def count_sent_today(session: AsyncSession) -> int:
             select(func.count(Alert.id)).where(Alert.telegram_sent.is_(True), Alert.ts >= since)
         )
     ).scalar_one()
-

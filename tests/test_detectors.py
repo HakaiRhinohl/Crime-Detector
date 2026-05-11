@@ -23,8 +23,8 @@ def test_oi_build_up_requires_percentile_and_median_multiple() -> None:
 def test_venue_specific_detects_dominant_venue_share() -> None:
     features = {
         ("venue_oi_share", "latest"): (0.82, {"venue": "bybit", "market_type": "perp"}),
+        ("oi_change_percentile", "seg_60d_1h"): (96.0, {}),
     }
     candidates = detect_venue_specific(1, "WIF", features)
     assert candidates
     assert candidates[0].venues["primary"] == "bybit"
-
